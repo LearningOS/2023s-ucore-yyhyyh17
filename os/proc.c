@@ -1,6 +1,7 @@
 #include "proc.h"
 #include "defs.h"
 #include "loader.h"
+#include "timer.h"
 #include "trap.h"
 
 struct proc pool[NPROC];
@@ -84,6 +85,8 @@ void scheduler(void)
 				/*
 				* LAB1: you may need to init proc start time here
 				*/
+				if (p->starttime == 0)
+					p->starttime = get_time();
 				p->state = RUNNING;
 				current_proc = p;
 				swtch(&idle.context, &p->context);
