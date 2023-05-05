@@ -57,7 +57,7 @@ pagetable_t bin_loader(uint64 start, uint64 end, struct proc *p)
 	p->trapframe->sp = p->ustack + USTACK_SIZE;
 	p->max_page = PGROUNDUP(p->ustack + USTACK_SIZE - 1) / PAGE_SIZE;
 	p->program_brk = p->ustack + USTACK_SIZE;
-        p->heap_bottom = p->ustack + USTACK_SIZE;
+	p->heap_bottom = p->ustack + USTACK_SIZE;
 	return pg;
 }
 
@@ -72,6 +72,8 @@ int run_all_app()
 		/*
 		* LAB1: you may need to initialize your new fields of proc here
 		*/
+		p->start_time = 0;
+		memset(p->syscall_times, 0, MAX_SYSCALL_NUM * sizeof(uint));
 	}
 	return 0;
 }
