@@ -145,13 +145,18 @@ uint64 sys_wait(int pid, uint64 va)
 uint64 sys_spawn(uint64 va)
 {
 	// TODO: your job is to complete the sys call
-	return -1;
+	struct proc *p = curr_proc();
+	char name[200];
+	copyinstr(p->pagetable, name, va, 200);
+	return spawn(name);
 }
 
 uint64 sys_set_priority(long long prio)
 {
 	// TODO: your job is to complete the sys call
-	return -1;
+	if (prio <= 1) return -1;
+	curr_proc()->pass = BIGSTRIDE / prio;
+	return prio;
 }
 
 uint64 sys_openat(uint64 va, uint64 omode, uint64 _flags)
@@ -264,6 +269,9 @@ void syscall()
 		break;
 	case SYS_spawn:
 		ret = sys_spawn(args[0]);
+		break;
+	case SYS_setpriority:
+		ret = sys_set_priority(args[0]);
 		break;
 	case SYS_sbrk:
 		ret = sys_sbrk(args[0]);
