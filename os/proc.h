@@ -8,6 +8,7 @@
 #define NPROC (512)
 #define FD_BUFFER_SIZE (16)
 #define MAX_SYSCALL_NUM (500)
+#define BIGSTRIDE (65536)
 
 struct file;
 
@@ -50,6 +51,8 @@ struct proc {
 	uint64 heap_bottom;
 	uint64 start_time;
 	uint syscall_times[MAX_SYSCALL_NUM];
+	uint64 stride;
+	uint64 pass;
 };
 
 enum TaskStatus {
@@ -75,6 +78,7 @@ void yield();
 int fork();
 int exec(char *);
 int wait(int, int *);
+int spawn(char *);
 void add_task(struct proc *);
 struct proc *pop_task();
 struct proc *allocproc();

@@ -57,6 +57,19 @@ struct proc *fetch_task()
 	return pool + index;
 }
 
+struct proc *fetch_task_prio()
+{
+	if (task_queue.empty) return NULL;
+	int *front = &task_queue.data[task_queue.front];
+	for (int i = task_queue.front; i != task_queue.tail; i = (i + 1) % NPROC)
+		if (pool[task_queue.data[i]].stride < pool[*front].stride) {
+			int t = task_queue.data[i];
+			task_queue.data[i] = *front;
+			*front = t;
+		}
+	return fetch_task();
+}
+
 void add_task(struct proc *p)
 {
 	push_queue(&task_queue, p - pool);
@@ -87,9 +100,13 @@ found:
 	p->pagetable = uvmcreate((uint64)p->trapframe);
 	p->program_brk = 0;
 	p->heap_bottom = 0;
+	p->start_time = 0;
+	p->stride = 0;
+	p->pass = BIGSTRIDE / 16;
 	memset(&p->context, 0, sizeof(p->context));
 	memset((void *)p->kstack, 0, KSTACK_SIZE);
 	memset((void *)p->trapframe, 0, TRAP_PAGE_SIZE);
+	memset(p->syscall_times, 0, MAX_SYSCALL_NUM * sizeof(uint));
 	p->context.ra = (uint64)usertrapret;
 	p->context.sp = p->kstack + KSTACK_SIZE;
 	return p;
@@ -117,7 +134,7 @@ void scheduler()
 		if(has_proc == 0) {
 			panic("all app are over!\n");
 		}*/
-		p = fetch_task();
+		p = fetch_task_prio();
 		if (p == NULL) {
 			panic("all app are over!\n");
 		}
@@ -125,6 +142,7 @@ void scheduler()
 		if (p->start_time == 0)
 			p->start_time = get_time();
 		p->state = RUNNING;
+		p->stride += p->pass;
 		current_proc = p;
 		swtch(&idle.context, &p->context);
 	}
@@ -189,6 +207,7 @@ int fork()
 	np->trapframe->a0 = 0;
 	np->parent = p;
 	np->state = RUNNABLE;
+	np->pass = p->pass;
 	add_task(np);
 	return np->pid;
 }
@@ -203,6 +222,20 @@ int exec(char *name)
 	p->max_page = 0;
 	loader(id, p);
 	return 0;
+}
+
+int spawn(char *name) {
+	int id = get_id_by_name(name);
+	if (id < 0) return -1;
+	struct proc *p = curr_proc();
+	struct proc *np = allocproc();
+	if (np == 0) return -1;
+	loader(id, np);
+	np->parent = p;
+	np->state = RUNNABLE;
+	np->pass = p->pass;
+	add_task(np);
+	return np->pid;
 }
 
 int wait(int pid, int *code)
