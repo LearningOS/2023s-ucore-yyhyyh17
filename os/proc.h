@@ -7,6 +7,7 @@
 
 #define NPROC (512)
 #define FD_BUFFER_SIZE (16)
+#define MAX_SYSCALL_NUM (500)
 
 struct file;
 
@@ -47,6 +48,21 @@ struct proc {
 	struct file *files[FD_BUFFER_SIZE];
 	uint64 program_brk;
 	uint64 heap_bottom;
+	uint64 start_time;
+	uint syscall_times[MAX_SYSCALL_NUM];
+};
+
+enum TaskStatus {
+    UnInit,
+    Ready,
+    Running,
+    Exited,
+};
+
+struct TaskInfo {
+    enum TaskStatus status;
+    uint syscall_times[MAX_SYSCALL_NUM];
+    int time;
 };
 
 int cpuid();

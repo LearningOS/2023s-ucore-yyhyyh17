@@ -16,7 +16,7 @@ uint64 sys_write(int fd, uint64 va, uint len)
 	int size = copyinstr(p->pagetable, str, va, MIN(len, MAX_STR_LEN));
 	debugf("size = %d", size);
 	for (int i = 0; i < size; ++i) {
-		console_putchar(str[i]);
+		consputc(str[i]);
 	}
 	return size;
 }
@@ -52,10 +52,10 @@ uint64 sys_gettimeofday(uint64 val, int _tz)
 {
 	struct proc *p = curr_proc();
 	uint64 cycle = get_cycle();
-	TimeVal t;
+	struct TimeVal t;
 	t.sec = cycle / CPU_FREQ;
 	t.usec = (cycle % CPU_FREQ) * 1000000 / CPU_FREQ;
-	copyout(p->pagetable, val, (char *)&t, sizeof(TimeVal));
+	copyout(p->pagetable, val, (char *)&t, sizeof(struct TimeVal));
 	return 0;
 }
 
@@ -98,20 +98,68 @@ uint64 sys_spawn(uint64 va)
 	return -1;
 }
 
-uint64 sys_set_priority(long long prio){
-    // TODO: your job is to complete the sys call
-    return -1;
+uint64 sys_set_priority(long long prio) {
+	// TODO: your job is to complete the sys call
+	return -1;
 }
-
 
 uint64 sys_sbrk(int n)
 {
-        uint64 addr;
-        struct proc *p = curr_proc();
-        addr = p->program_brk;
-        if(growproc(n) < 0)
-                return -1;
-        return addr;
+	uint64 addr;
+	struct proc *p = curr_proc();
+	addr = p->program_brk;
+	if (growproc(n) < 0)
+		return -1;
+	return addr;
+}
+
+uint64 sys_task_info(uint64 val)
+{
+	struct proc *p = curr_proc();
+	struct TaskInfo ti;
+	ti.status = RUNNING;
+	memmove(ti.syscall_times, p->syscall_times, MAX_SYSCALL_NUM * sizeof(uint));
+	ti.time = get_time() - p->start_time;
+	copyout(p->pagetable, val, (char *)&ti, sizeof(struct TaskInfo));
+	return 0;
+}
+
+uint64 sys_mmap(uint64 start, uint64 len, int prot, int flag, int fd)
+{
+	if (len == 0) return 0;
+	if (!PGALIGNED(start)) return -1;
+	if ((prot & ~7) != 0) return -1;
+	if ((prot & 7) == 0) return -1;
+	int perm = (prot << 1) | PTE_U;
+	uint64 end = start + len;
+	struct proc *p = curr_proc();
+	pagetable_t pagetable = p->pagetable;
+	for (uint64 va = start; va < end; va += PAGE_SIZE) {
+		if (useraddr(pagetable, va) != 0) return -1;
+		uint64 pa = (uint64)kalloc();
+		if (pa == 0 || mappages(pagetable, va, PAGE_SIZE, pa, perm) < 0) return -1;
+	}
+	p->max_page = MAX(p->max_page, PGROUNDUP(end) / PAGE_SIZE);
+	return 0;
+}
+
+uint64 sys_munmap(uint64 start, uint64 len)
+{
+	if (len == 0) return 0;
+	if (!PGALIGNED(start)) return -1;
+	uint64 end = start + len;
+	struct proc *p = curr_proc();
+	pagetable_t pagetable = p->pagetable;
+	for (uint64 va = start; va < end; va += PAGE_SIZE) {
+		pte_t *pte = walk(pagetable, va, 0);
+		if (pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0) return -1;
+		uint64 pa = PTE2PA(*pte);
+		kfree((void *)pa);
+		*pte = 0;
+	}
+	if (p->max_page == PGROUNDUP(end) / PAGE_SIZE)
+		p->max_page = start / PAGE_SIZE;
+	return 0;
 }
 
 extern char trap_page[];
@@ -159,8 +207,17 @@ void syscall()
 		ret = sys_spawn(args[0]);
 		break;
 	case SYS_sbrk:
-                ret = sys_sbrk(args[0]);
-                break;
+		ret = sys_sbrk(args[0]);
+		break;
+	case SYS_task_info:
+		ret = sys_task_info(args[0]);
+		break;
+	case SYS_mmap:
+		ret = sys_mmap(args[0], args[1], args[2], args[3], args[4]);
+		break;
+	case SYS_munmap:
+		ret = sys_munmap(args[0], args[1]);
+		break;
 	default:
 		ret = -1;
 		errorf("unknown syscall %d", id);
