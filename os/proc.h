@@ -55,19 +55,6 @@ struct proc {
 	uint64 pass;
 };
 
-enum TaskStatus {
-    UnInit,
-    Ready,
-    Running,
-    Exited,
-};
-
-struct TaskInfo {
-    enum TaskStatus status;
-    uint syscall_times[MAX_SYSCALL_NUM];
-    int time;
-};
-
 int cpuid();
 struct proc *curr_proc();
 void exit(int);

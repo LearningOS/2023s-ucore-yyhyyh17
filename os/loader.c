@@ -44,7 +44,7 @@ int bin_loader(struct inode *ip, struct proc *p)
 	p->trapframe->epc = va_start;
 	p->max_page = PGROUNDUP(p->ustack + USTACK_SIZE - 1) / PAGE_SIZE;
 	p->program_brk = p->ustack + USTACK_SIZE;
-        p->heap_bottom = p->ustack + USTACK_SIZE;
+	p->heap_bottom = p->ustack + USTACK_SIZE;
 	p->state = RUNNABLE;
 	return 0;
 }

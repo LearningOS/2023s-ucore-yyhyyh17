@@ -4,6 +4,7 @@
 #include "trap.h"
 #include "vm.h"
 #include "queue.h"
+#include "timer.h"
 
 struct proc pool[NPROC];
 __attribute__((aligned(16))) char kstack[NPROC][PAGE_SIZE];
@@ -111,7 +112,7 @@ found:
 	memset(&p->context, 0, sizeof(p->context));
 	memset((void *)p->kstack, 0, KSTACK_SIZE);
 	memset((void *)p->trapframe, 0, TRAP_PAGE_SIZE);
-	memset(p->files, 0, sizeof(struct file *) * FD_BUFFER_SIZE);
+	memset(p->files, 0, FD_BUFFER_SIZE * sizeof(uint64));
 	memset(p->syscall_times, 0, MAX_SYSCALL_NUM * sizeof(uint));
 	p->context.ra = (uint64)usertrapret;
 	p->context.sp = p->kstack + KSTACK_SIZE;
@@ -156,6 +157,8 @@ void scheduler()
 			panic("all app are over!\n");
 		}
 		tracef("swtich to proc %d", p - pool);
+		if (p->start_time == 0)
+			p->start_time = get_time();
 		p->state = RUNNING;
 		p->stride += p->pass;
 		current_proc = p;
@@ -294,26 +297,14 @@ int exec(char *path, char **argv)
 }
 
 int spawn(char *name) {
-	int id = get_id_by_name(name);
-	if (id < 0) return -1;
+	struct inode *ip = namei(name);
+	if (ip == 0) return -1;
 	struct proc *p = curr_proc();
 	struct proc *np = allocproc();
 	if (np == 0) return -1;
-	loader(id, np);
-	np->parent = p;
-	np->state = RUNNABLE;
-	np->pass = p->pass;
-	add_task(np);
-	return np->pid;
-}
-
-int spawn(char *name) {
-	int id = get_id_by_name(name);
-	if (id < 0) return -1;
-	struct proc *p = curr_proc();
-	struct proc *np = allocproc();
-	if (np == 0) return -1;
-	loader(id, np);
+	init_stdio(np);
+	bin_loader(ip, np);
+	iput(ip);
 	np->parent = p;
 	np->state = RUNNABLE;
 	np->pass = p->pass;
@@ -386,24 +377,25 @@ int fdalloc(struct file *f)
 	}
 	return -1;
 }
+
 // Grow or shrink user memory by n bytes.
 // Return 0 on succness, -1 on failure.
 int growproc(int n)
 {
-        uint64 program_brk;
-        struct proc *p = curr_proc();
-        program_brk = p->program_brk;
-        int new_brk = program_brk + n - p->heap_bottom;
-        if(new_brk < 0){
-                return -1;
-        }
-        if(n > 0){
-                if((program_brk = uvmalloc(p->pagetable, program_brk, program_brk + n, PTE_W)) == 0) {
-                        return -1;
-                }
-        } else if(n < 0){
-                program_brk = uvmdealloc(p->pagetable, program_brk, program_brk + n);
-        }
-        p->program_brk = program_brk;
-        return 0;
+	uint64 program_brk;
+	struct proc *p = curr_proc();
+	program_brk = p->program_brk;
+	int new_brk = program_brk + n - p->heap_bottom;
+	if (new_brk < 0) {
+		return -1;
+	}
+	if (n > 0) {
+		if((program_brk = uvmalloc(p->pagetable, program_brk, program_brk + n, PTE_W)) == 0) {
+			return -1;
+		}
+	} else if (n < 0) {
+		program_brk = uvmdealloc(p->pagetable, program_brk, program_brk + n);
+	}
+	p->program_brk = program_brk;
+	return 0;
 }

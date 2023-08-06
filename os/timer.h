@@ -10,10 +10,6 @@
 uint64 get_cycle();
 void timer_init();
 void set_next_timer();
-
-typedef struct {
-	uint64 sec; // 自 Unix 纪元起的秒数
-	uint64 usec; // 微秒数
-} TimeVal;
+uint64 get_time();
 
 #endif // TIMER_H

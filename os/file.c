@@ -69,7 +69,6 @@ static struct inode *create(char *path, short type)
 {
 	struct inode *ip, *dp;
 	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
-	ivalid(dp);
 	if ((ip = dirlookup(dp, path, 0)) != 0) {
 		warnf("create a exist file\n");
 		iput(dp); //Close the root_inode
