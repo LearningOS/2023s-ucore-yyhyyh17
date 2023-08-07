@@ -143,6 +143,13 @@ found:
 	p->next_semaphore_id = 0;
 	p->next_condvar_id = 0;
 	// LAB5: (1) you may initialize your new proc variables here
+	p->deadlock_detect_enabled = 0;
+	memset(p->mtx_available, 0, sizeof(int) * LOCK_POOL_SIZE);
+	memset(p->mtx_allocation, 0, sizeof(int) * LOCK_POOL_SIZE * NTHREAD);
+	memset(p->mtx_request, 0, sizeof(int) * LOCK_POOL_SIZE * NTHREAD);
+	memset(p->sem_available, 0, sizeof(int) * LOCK_POOL_SIZE);
+	memset(p->sem_allocation, 0, sizeof(int) * LOCK_POOL_SIZE * NTHREAD);
+	memset(p->sem_request, 0, sizeof(int) * LOCK_POOL_SIZE * NTHREAD);
 	return p;
 }
 
